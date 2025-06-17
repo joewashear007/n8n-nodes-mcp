@@ -19,7 +19,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/nerding-io/n8n-nodes-mcp-session.git"
+		"url": "https://github.com/MeAiXueXi/n8n-nodes-mcp-session.git"
 	},
 	"main": "index.js",
 	"scripts": {
