@@ -1,7 +1,7 @@
 {
-	"name": "n8n-nodes-mcp",
-	"version": "0.1.28",
-	"description": "MCP nodes for n8n ",
+	"name": "n8n-nodes-mcp-session",
+	"version": "0.1.29",
+	"description": "MCP nodes for n8n with session management support",
 	"keywords": [
 		"n8n-community-node-package",
 		"mcp",
@@ -19,7 +19,7 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/nerding-io/n8n-nodes-mcp.git"
+		"url": "https://github.com/nerding-io/n8n-nodes-mcp-session.git"
 	},
 	"main": "index.js",
 	"scripts": {

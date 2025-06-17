@@ -14,6 +14,7 @@ import { RequestOptions } from '@modelcontextprotocol/sdk/shared/protocol';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { McpSessionManager } from './McpSessionManager.js';
 
 // Add Node.js process type declaration
 declare const process: {
@@ -22,15 +23,15 @@ declare const process: {
 
 export class McpClient implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'MCP Client',
+		displayName: 'MCP Client (Session Management)',
 		name: 'mcpClient',
 		icon: 'file:mcpClient.svg',
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
-		description: 'Use MCP client',
+		description: 'MCP client with session management for stateful connections',
 		defaults: {
-			name: 'MCP Client',
+			name: 'MCP Client (Session Management)',
 		},
 		// @ts-ignore - node-class-description-outputs-wrong
 		inputs: [{ type: NodeConnectionType.Main }],
@@ -201,6 +202,8 @@ export class McpClient implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 		const operation = this.getNodeParameter('operation', 0) as string;
 		let transport: Transport | undefined;
+		let sessionManager: McpSessionManager | undefined;
+		let client: Client | undefined;
 
 		// For backward compatibility - if connectionType isn't set, default to 'cmd'
 		let connectionType = 'cmd';
@@ -213,6 +216,9 @@ export class McpClient implements INodeType {
 		let timeout = 600000;
 
 		try {
+			// Prepare connection configuration for session ID generation
+			let connectionConfig: any = { connectionType };
+
 			if (connectionType === 'http') {
 				// Use HTTP Streamable transport
 				const httpCredentials = await this.getCredentials('mcpClientHttpApi');
@@ -241,6 +247,14 @@ export class McpClient implements INodeType {
 						}
 					}
 				}
+
+				// Update connection configuration
+				connectionConfig = {
+					connectionType,
+					httpStreamUrl,
+					messagesPostEndpoint,
+					headers
+				};
 
 				const requestInit: RequestInit = { headers };
 				if (messagesPostEndpoint) {
@@ -280,6 +294,14 @@ export class McpClient implements INodeType {
 					}
 				}
 
+				// Update connection configuration
+				connectionConfig = {
+					connectionType,
+					sseUrl,
+					messagesPostEndpoint,
+					headers
+				};
+
 				// Create SSE transport with dynamic import to avoid TypeScript errors
 				transport = new SSEClientTransport(
 					// @ts-ignore
@@ -292,9 +314,9 @@ export class McpClient implements INodeType {
 							headers,
 							...(messagesPostEndpoint
 								? {
-									// @ts-ignore
-									endpoint: new URL(messagesPostEndpoint),
-								}
+										// @ts-ignore
+										endpoint: new URL(messagesPostEndpoint),
+									}
 								: {}),
 						},
 					},
@@ -344,6 +366,14 @@ export class McpClient implements INodeType {
 					}
 				}
 
+				// Update connection configuration
+				connectionConfig = {
+					connectionType,
+					command: cmdCredentials.command as string,
+					args: (cmdCredentials.args as string)?.split(' ') || [],
+					env
+				};
+
 				transport = new StdioClientTransport({
 					command: cmdCredentials.command as string,
 					args: (cmdCredentials.args as string)?.split(' ') || [],
@@ -363,31 +393,35 @@ export class McpClient implements INodeType {
 				};
 			}
 
-			const client = new Client(
-				{
-					name: `${McpClient.name}-client`,
-					version: '1.0.0',
-				},
-				{
-					capabilities: {
-						prompts: {},
-						resources: {},
-						tools: {},
-					},
-				},
-			);
-
-			try {
-				if (!transport) {
-					throw new NodeOperationError(this.getNode(), 'No transport available');
+			// Use session manager to get or create connection
+			const sessionId = McpSessionManager.generateSessionId(connectionConfig);
+			sessionManager = McpSessionManager.getInstance(sessionId);
+			
+				// First try to get existing connection
+			const existingClient = sessionManager.getClient();
+			if (existingClient) {
+				client = existingClient;
+			}
+			
+			if (!client) {
+				// If no existing connection, establish new connection
+				try {
+					if (!transport) {
+						throw new Error('No transport available');
+					}
+					client = await sessionManager.connect(transport);
+				} catch (error) {
+					throw new NodeOperationError(
+						this.getNode(),
+						`Failed to connect to MCP server: ${error instanceof Error ? error.message : String(error)}`,
+					);
 				}
-				await client.connect(transport);
-				this.logger.debug('Client connected to MCP server');
-			} catch (connectionError) {
-				this.logger.error(`MCP client connection error: ${(connectionError as Error).message}`);
+			}
+			
+			if (!client) {
 				throw new NodeOperationError(
 					this.getNode(),
-					`Failed to connect to MCP server: ${(connectionError as Error).message}`,
+					'Failed to get MCP client from session manager',
 				);
 			}
 
@@ -500,10 +534,10 @@ export class McpClient implements INodeType {
 							schema: paramSchema,
 							func: async (params) => {
 								try {
-									const result = await client.callTool({
-										name: tool.name,
-										arguments: params,
-									}, CallToolResultSchema, requestOptions);
+								const result = await client!.callTool({
+									name: tool.name,
+									arguments: params,
+								}, CallToolResultSchema, requestOptions);
 
 									return typeof result === 'object' ? JSON.stringify(result) : String(result);
 								} catch (error) {
@@ -580,7 +614,7 @@ export class McpClient implements INodeType {
 
 					// Validate tool exists before executing
 					try {
-						const availableTools = await client.listTools();
+						const availableTools = await client!.listTools();
 						const toolsList = Array.isArray(availableTools)
 							? availableTools
 							: Array.isArray(availableTools?.tools)
@@ -601,7 +635,7 @@ export class McpClient implements INodeType {
 							`Executing tool: ${toolName} with params: ${JSON.stringify(toolParams)}`,
 						);
 
-						const result = await client.callTool({
+						const result = await client!.callTool({
 							name: toolName,
 							arguments: toolParams,
 						}, CallToolResultSchema, requestOptions);
@@ -621,7 +655,7 @@ export class McpClient implements INodeType {
 				}
 
 				case 'listPrompts': {
-					const prompts = await client.listPrompts();
+					const prompts = await client!.listPrompts();
 					returnData.push({
 						json: { prompts },
 					});
@@ -630,7 +664,8 @@ export class McpClient implements INodeType {
 
 				case 'getPrompt': {
 					const promptName = this.getNodeParameter('promptName', 0) as string;
-					const prompt = await client.getPrompt({
+
+					const prompt = await client!.getPrompt({
 						name: promptName,
 					});
 					returnData.push({
@@ -650,8 +685,14 @@ export class McpClient implements INodeType {
 				`Failed to execute operation: ${(error as Error).message}`,
 			);
 		} finally {
-			if (transport) {
-				await transport.close();
+			// No longer close connection here, session manager handles connection lifecycle
+			// If transport was newly created but connection failed, it needs to be closed
+			if (transport && !client) {
+				try {
+					await transport.close();
+				} catch (error) {
+					this.logger.error(`Error closing transport: ${error instanceof Error ? error.message : String(error)}`);
+				}
 			}
 		}
 	}

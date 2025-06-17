@@ -1,13 +1,45 @@
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/bd76f121-1c8f-4f5d-9c65-1eac5d81b6af)
 
-# n8n-nodes-mcp-client
+# n8n-nodes-mcp-session
 
 > **Important Note:**
 > The Server-Sent Events (SSE) transport is deprecated and replaced by the new HTTP Streamable transport. SSE remains available for legacy compatibility, but HTTP Streamable is now the recommended method for all new implementations.
 
-This is an n8n community node that lets you interact with Model Context Protocol (MCP) servers in your n8n workflows.
+This is an **enhanced fork** of the original n8n-nodes-mcp-client that adds **advanced session management capabilities** for stateful MCP server interactions.
 
-MCP is a protocol that enables AI models to interact with external tools and data sources in a standardized way. This node allows you to connect to MCP servers, access resources, execute tools, and use prompts.
+## 🚀 Key Differences from Original Version
+
+### **Session Management (NEW)**
+Unlike the original version that creates a new connection for every tool call, this enhanced version includes:
+
+- **Connection Reuse**: Automatically reuses connections across multiple tool calls within the same session
+- **State Persistence**: Maintains server state between operations (perfect for playwright-mcp browser automation)
+- **Smart Session Management**: Sessions are automatically managed with configurable timeouts (30 minutes default)
+- **Performance Optimization**: Significantly reduces connection overhead and improves response times
+- **Memory Efficiency**: Automatic cleanup of expired sessions to prevent memory leaks
+
+### **Enhanced Playwright Support**
+Specifically optimized for playwright-mcp and similar stateful servers:
+
+- **Browser State Persistence**: Keep browser instances alive between tool calls
+- **Multi-step Automation**: Execute complex browser workflows across multiple nodes
+- **Session Isolation**: Different workflows use separate browser sessions
+- **Automatic Cleanup**: Browser instances are cleaned up after session timeout
+
+### **Backward Compatibility**
+- **100% Compatible**: All existing workflows continue to work without modification
+- **No Breaking Changes**: Existing configurations and credentials remain valid
+- **Seamless Migration**: Simply replace the original node with this enhanced version
+
+### **Technical Improvements**
+- **McpSessionManager**: New session management system with connection pooling
+- **Error Resilience**: Better error handling and connection recovery
+- **Resource Management**: Intelligent cleanup of connections and resources
+- **Performance Monitoring**: Built-in session statistics and monitoring
+
+---
+
+MCP is a protocol that enables AI models to interact with external tools and data sources in a standardized way. This node allows you to connect to MCP servers, access resources, execute tools, and use prompts. With the enhanced session management feature, connections are automatically reused across multiple tool calls, making it perfect for stateful MCP servers like playwright-mcp that need to maintain browser state between operations.
 
 [n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
@@ -50,7 +82,38 @@ Check out my YouTube Series [MCP Explained](https://www.youtube.com/playlist?lis
 
 ## Installation
 
-Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation.
+### Installing from npm
+
+To install this enhanced MCP client with session management support, use the following package name:
+
+```bash
+npm install n8n-nodes-mcp-session
+```
+
+### Installing in n8n Community Nodes
+
+1. **Via n8n UI (Recommended)**:
+   - Go to **Settings** → **Community Nodes**
+   - Click **Install a community node**
+   - Enter the package name: `n8n-nodes-mcp-session`
+   - Click **Install**
+
+2. **Via Environment Variable**:
+   ```bash
+   export N8N_NODES_INCLUDE="n8n-nodes-mcp-session"
+   ```
+
+3. **Via Docker**:
+   ```yaml
+   environment:
+     - N8N_NODES_INCLUDE=n8n-nodes-mcp-session
+   ```
+
+### Important Notes
+
+- This package replaces the original `n8n-nodes-mcp` with enhanced session management
+- All existing workflows remain compatible - no migration needed
+- Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation for detailed instructions
 
 Also pay attention to Environment Variables for [using tools in AI Agents](#using-as-a-tool). It's mandatory to set the `N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE` environment variable to `true` if you want to use the MCP Client node as a tool in AI Agents.
 
