@@ -21,8 +21,6 @@ declare const process: {
 };
 
 export class McpClient implements INodeType {
-	private clientInstance: Client | null = null;
-	private transportInstance: Transport | null = null;
 	description: INodeTypeDescription = {
 		displayName: 'MCP Client',
 		name: 'mcpClient',
@@ -202,10 +200,7 @@ export class McpClient implements INodeType {
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const returnData: INodeExecutionData[] = [];
 		const operation = this.getNodeParameter('operation', 0) as string;
-<<<<<<< HEAD
 		let transport: Transport | undefined;
-=======
->>>>>>> 75ece86 (Initial commit)
 
 		// For backward compatibility - if connectionType isn't set, default to 'cmd'
 		let connectionType = 'cmd';
@@ -218,14 +213,7 @@ export class McpClient implements INodeType {
 		let timeout = 600000;
 
 		try {
-<<<<<<< HEAD
 			if (connectionType === 'http') {
-=======
-			// Check if we have an existing client and transport instance
-			if (!this.clientInstance || !this.transportInstance || !this.transportInstance.isConnected) {
-				this.logger.debug('No active client or transport instance found, or transport is not connected. Creating new instances.');
-				if (connectionType === 'http') {
->>>>>>> 75ece86 (Initial commit)
 				// Use HTTP Streamable transport
 				const httpCredentials = await this.getCredentials('mcpClientHttpApi');
 
@@ -368,30 +356,14 @@ export class McpClient implements INodeType {
 				);
 			}
 
-<<<<<<< HEAD
 			// Add error handling to transport
 			if (transport) {
 				transport.onerror = (error: Error) => {
-=======
-			// Store the transport instance
-			this.transportInstance = transport;
-
-			// Add error handling to transport
-			if (this.transportInstance) {
-				this.transportInstance.onerror = (error: Error) => {
-					// Reset instances on transport error to allow re-connection on next execution
-					this.clientInstance = null;
-					this.transportInstance = null;
->>>>>>> 75ece86 (Initial commit)
 					throw new NodeOperationError(this.getNode(), `Transport error: ${error.message}`);
 				};
 			}
 
-<<<<<<< HEAD
 			const client = new Client(
-=======
-			this.clientInstance = new Client(
->>>>>>> 75ece86 (Initial commit)
 				{
 					name: `${McpClient.name}-client`,
 					version: '1.0.0',
@@ -406,7 +378,6 @@ export class McpClient implements INodeType {
 			);
 
 			try {
-<<<<<<< HEAD
 				if (!transport) {
 					throw new NodeOperationError(this.getNode(), 'No transport available');
 				}
@@ -414,33 +385,11 @@ export class McpClient implements INodeType {
 				this.logger.debug('Client connected to MCP server');
 			} catch (connectionError) {
 				this.logger.error(`MCP client connection error: ${(connectionError as Error).message}`);
-=======
-				if (!this.transportInstance) {
-					throw new NodeOperationError(this.getNode(), 'No transport available for connection');
-				}
-				await this.clientInstance.connect(this.transportInstance);
-				this.logger.debug('Client connected to MCP server');
-			} catch (connectionError) {
-				this.logger.error(`MCP client connection error: ${(connectionError as Error).message}`);
-				this.clientInstance = null;
-				this.transportInstance = null;
->>>>>>> 75ece86 (Initial commit)
 				throw new NodeOperationError(
 					this.getNode(),
 					`Failed to connect to MCP server: ${(connectionError as Error).message}`,
 				);
 			}
-<<<<<<< HEAD
-=======
-		} else {
-			this.logger.debug('Using existing client and transport instance.');
-		}
-
-			// Ensure clientInstance is available before proceeding
-			if (!this.clientInstance) {
-				throw new NodeOperationError(this.getNode(), 'MCP Client instance is not available.');
-			}
->>>>>>> 75ece86 (Initial commit)
 
 			// Create a RequestOptions object from environment variables
 			const requestOptions: RequestOptions = {};
@@ -448,11 +397,7 @@ export class McpClient implements INodeType {
 
 			switch (operation) {
 				case 'listResources': {
-<<<<<<< HEAD
 					const resources = await client.listResources();
-=======
-					const resources = await this.clientInstance.listResources();
->>>>>>> 75ece86 (Initial commit)
 					returnData.push({
 						json: { resources },
 					});
@@ -460,11 +405,7 @@ export class McpClient implements INodeType {
 				}
 
 				case 'listResourceTemplates': {
-<<<<<<< HEAD
 					const resourceTemplates = await client.listResourceTemplates();
-=======
-					const resourceTemplates = await this.clientInstance.listResourceTemplates();
->>>>>>> 75ece86 (Initial commit)
 					returnData.push({
 						json: { resourceTemplates },
 					});
@@ -473,11 +414,7 @@ export class McpClient implements INodeType {
 
 				case 'readResource': {
 					const uri = this.getNodeParameter('resourceUri', 0) as string;
-<<<<<<< HEAD
 					const resource = await client.readResource({
-=======
-					const resource = await this.clientInstance.readResource({
->>>>>>> 75ece86 (Initial commit)
 						uri,
 					});
 					returnData.push({
@@ -487,11 +424,7 @@ export class McpClient implements INodeType {
 				}
 
 				case 'listTools': {
-<<<<<<< HEAD
 					const rawTools = await client.listTools();
-=======
-					const rawTools = await this.clientInstance.listTools();
->>>>>>> 75ece86 (Initial commit)
 					const tools = Array.isArray(rawTools)
 						? rawTools
 						: Array.isArray(rawTools?.tools)
@@ -563,23 +496,11 @@ export class McpClient implements INodeType {
 
 						return new DynamicStructuredTool({
 							name: tool.name,
-<<<<<<< HEAD
 							description: tool.description || `Execute the ${tool.name} tool`,
 							schema: paramSchema,
 							func: async (params) => {
 								try {
 									const result = await client.callTool({
-=======
-									description: tool.description || `Execute the ${tool.name} tool`,
-									schema: paramSchema,
-									func: async (params) => {
-										try {
-											// Ensure clientInstance is available before calling tool
-											if (!this.clientInstance) {
-												throw new NodeOperationError(this.getNode(), 'MCP Client instance is not available for tool execution.');
-											}
-											const result = await this.clientInstance.callTool({
->>>>>>> 75ece86 (Initial commit)
 										name: tool.name,
 										arguments: params,
 									}, CallToolResultSchema, requestOptions);
@@ -659,11 +580,7 @@ export class McpClient implements INodeType {
 
 					// Validate tool exists before executing
 					try {
-<<<<<<< HEAD
 						const availableTools = await client.listTools();
-=======
-						const availableTools = await this.clientInstance.listTools();
->>>>>>> 75ece86 (Initial commit)
 						const toolsList = Array.isArray(availableTools)
 							? availableTools
 							: Array.isArray(availableTools?.tools)
@@ -684,11 +601,7 @@ export class McpClient implements INodeType {
 							`Executing tool: ${toolName} with params: ${JSON.stringify(toolParams)}`,
 						);
 
-<<<<<<< HEAD
 						const result = await client.callTool({
-=======
-						const result = await this.clientInstance.callTool({
->>>>>>> 75ece86 (Initial commit)
 							name: toolName,
 							arguments: toolParams,
 						}, CallToolResultSchema, requestOptions);
@@ -708,11 +621,7 @@ export class McpClient implements INodeType {
 				}
 
 				case 'listPrompts': {
-<<<<<<< HEAD
 					const prompts = await client.listPrompts();
-=======
-					const prompts = await this.clientInstance.listPrompts();
->>>>>>> 75ece86 (Initial commit)
 					returnData.push({
 						json: { prompts },
 					});
@@ -721,11 +630,7 @@ export class McpClient implements INodeType {
 
 				case 'getPrompt': {
 					const promptName = this.getNodeParameter('promptName', 0) as string;
-<<<<<<< HEAD
 					const prompt = await client.getPrompt({
-=======
-					const prompt = await this.clientInstance.getPrompt({
->>>>>>> 75ece86 (Initial commit)
 						name: promptName,
 					});
 					returnData.push({
@@ -740,28 +645,14 @@ export class McpClient implements INodeType {
 
 			return [returnData];
 		} catch (error) {
-<<<<<<< HEAD
-=======
-			// If any operation fails, we might want to reset the client and transport
-			// to ensure a fresh state for the next execution, especially if the error
-			// indicates a connection issue.
-			this.logger.error(`Operation failed: ${(error as Error).message}. Resetting client and transport.`);
-			this.clientInstance = null;
-			this.transportInstance = null;
->>>>>>> 75ece86 (Initial commit)
 			throw new NodeOperationError(
 				this.getNode(),
 				`Failed to execute operation: ${(error as Error).message}`,
 			);
-<<<<<<< HEAD
 		} finally {
 			if (transport) {
 				await transport.close();
 			}
 		}
-=======
-		} 
-		// Removed finally block that closes transport to keep connection alive
->>>>>>> 75ece86 (Initial commit)
 	}
 }
