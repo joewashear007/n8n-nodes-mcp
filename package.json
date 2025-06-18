@@ -1,6 +1,6 @@
 {
 	"name": "n8n-nodes-mcp-session",
-	"version": "0.1.29",
+	"version": "0.1.30",
 	"description": "MCP nodes for n8n with session management support",
 	"keywords": [
 		"n8n-community-node-package",
