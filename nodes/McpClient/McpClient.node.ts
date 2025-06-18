@@ -407,7 +407,7 @@ export class McpClient implements INodeType {
 				// If no existing connection, establish new connection
 				try {
 					if (!transport) {
-						throw new Error('No transport available');
+						throw new NodeOperationError(this.getNode(), 'No transport available');
 					}
 					client = await sessionManager.connect(transport);
 				} catch (error) {
