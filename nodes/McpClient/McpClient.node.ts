@@ -393,22 +393,29 @@ export class McpClient implements INodeType {
 				};
 			}
 
-			// Use session manager to get or create connection
-			const sessionId = McpSessionManager.generateSessionId(connectionConfig);
+			let sessionId = McpSessionManager.generateSessionId(connectionConfig);
 			sessionManager = McpSessionManager.getInstance(sessionId);
 			
-				// First try to get existing connection
-			const existingClient = sessionManager.getClient();
-			if (existingClient) {
-				client = existingClient;
+			try {
+				const existingClient = await sessionManager.getClient();
+				if (existingClient) {
+					client = existingClient;
+				}
+			} catch (error) {
+				console.log(`Failed to get existing client for session ${sessionId}, will create new connection`);
 			}
 			
 			if (!client) {
-				// If no existing connection, establish new connection
 				try {
 					if (!transport) {
 						throw new NodeOperationError(this.getNode(), 'No transport available');
 					}
+					
+					if (!sessionManager.isSessionConnected()) {
+						sessionId = McpSessionManager.createNewSession(connectionConfig);
+						sessionManager = McpSessionManager.getInstance(sessionId);
+					}
+					
 					client = await sessionManager.connect(transport);
 				} catch (error) {
 					throw new NodeOperationError(

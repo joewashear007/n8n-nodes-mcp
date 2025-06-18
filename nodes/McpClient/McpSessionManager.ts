@@ -52,16 +52,19 @@ export class McpSessionManager {
 		httpStreamUrl?: string;
 		sseUrl?: string;
 		headers?: Record<string, string>;
+		timestamp?: number;
 	}): string {
 		const configStr = JSON.stringify(connectionConfig);
-		// Use simple hash function to generate session ID
+		const timestamp = connectionConfig.timestamp || Date.now();
+		const combined = `${configStr}_${timestamp}`;
+		
 		let hash = 0;
-		for (let i = 0; i < configStr.length; i++) {
-			const char = configStr.charCodeAt(i);
+		for (let i = 0; i < combined.length; i++) {
+			const char = combined.charCodeAt(i);
 			hash = ((hash << 5) - hash) + char;
-			hash = hash & hash; // Convert to 32-bit integer
+			hash = hash & hash;
 		}
-		return `mcp_session_${Math.abs(hash).toString(36)}`;
+		return `mcp_session_${Math.abs(hash).toString(36)}_${timestamp.toString(36)}`;
 	}
 
 	/**
@@ -70,13 +73,18 @@ export class McpSessionManager {
 	 * @returns Promise<Client>
 	 */
 	async connect(transport: Transport): Promise<Client> {
-		// If already connected, return client directly
 		if (this.isConnected && this.client) {
-			this.lastUsed = Date.now();
-			return this.client;
+			try {
+				await this.validateConnection();
+				this.lastUsed = Date.now();
+				return this.client;
+			} catch (error) {
+				console.log(`Session ${this.sessionId} connection validation failed, reconnecting...`);
+				this.isConnected = false;
+				this.client = null;
+			}
 		}
 
-		// If connecting, wait for connection to complete
 		if (this.connectionPromise) {
 			await this.connectionPromise;
 			if (this.isConnected && this.client) {
@@ -85,7 +93,6 @@ export class McpSessionManager {
 			}
 		}
 
-		// Start new connection
 		this.connectionPromise = this.doConnect(transport);
 		await this.connectionPromise;
 		this.connectionPromise = null;
@@ -122,11 +129,11 @@ export class McpSessionManager {
 				},
 			);
 
-			// Set transport error handling
 			transport.onerror = (error: Error) => {
 				console.error(`MCP Transport error for session ${this.sessionId}:`, error.message);
 				this.isConnected = false;
-				// Don't clean up immediately, allow reconnection
+				this.client = null;
+				this.transport = null;
 			};
 
 			// Connect to server
@@ -143,11 +150,23 @@ export class McpSessionManager {
 		}
 	}
 
-	/**
-	 * Get client instance
-	 * @returns Client instance or null
-	 */
-	getClient(): Client | null {
+	async getClient(): Promise<Client | null> {
+		if (this.isConnected && this.client) {
+			try {
+				await this.validateConnection();
+				this.lastUsed = Date.now();
+				return this.client;
+			} catch (error) {
+				console.log(`Session ${this.sessionId} validation failed during getClient`);
+				this.isConnected = false;
+				this.client = null;
+				return null;
+			}
+		}
+		return null;
+	}
+
+	getClientSync(): Client | null {
 		if (this.isConnected && this.client) {
 			this.lastUsed = Date.now();
 			return this.client;
@@ -155,12 +174,28 @@ export class McpSessionManager {
 		return null;
 	}
 
-	/**
-	 * Check connection status
-	 * @returns Whether connected
-	 */
 	isSessionConnected(): boolean {
 		return this.isConnected && this.client !== null;
+	}
+
+	private async validateConnection(): Promise<void> {
+		if (!this.client || !this.transport) {
+			throw new Error('No client or transport available');
+		}
+
+		try {
+			await this.client.listTools();
+		} catch (error) {
+			throw new Error(`Connection validation failed: ${(error as Error).message}`);
+		}
+	}
+
+	static createNewSession(connectionConfig: any): string {
+		const newConfig = {
+			...connectionConfig,
+			timestamp: Date.now()
+		};
+		return McpSessionManager.generateSessionId(newConfig);
 	}
 
 	/**
